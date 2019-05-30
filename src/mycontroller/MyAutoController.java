@@ -5,6 +5,7 @@ import swen30006.driving.Simulation;
 import world.Car;
 import world.WorldSpatial;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import tiles.MapTile;
@@ -25,7 +26,9 @@ public class MyAutoController extends CarController{
 		private final int CAR_MAX_SPEED = 1;
 		
 		private int parcelsFound = 0;
+		private ArrayList<Coordinate> parcels = new ArrayList<Coordinate>();
 		private boolean exitFound = false;
+		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
 		
 		private CarStrategy strategy; 
@@ -36,6 +39,7 @@ public class MyAutoController extends CarController{
 			super(car);
 			mode = Simulation.toConserve();
 			strategy = CarStrategyFactory.getInstance().getStrategy(this);
+			HashMap<Coordinate, MapTile> x = getMap();
 		}
 				
 		public Simulation.StrategyMode getMode() {
@@ -52,12 +56,14 @@ public class MyAutoController extends CarController{
 						TrapTile value2 = (TrapTile) value;
 						if (value2.getTrap().equals("parcel")) {
 							parcelsFound++;
+							parcels.add(key);
 							if (parcelsFound == numParcels() && exitFound == true) {
 								phase = "search";
 							}
 						}
 					} else if (value.getType() == MapTile.Type.FINISH) {
 						exitFound = true;
+						exit.add(key);
 						if (parcelsFound == numParcels() && exitFound == true) {
 							phase = "search";
 						}
