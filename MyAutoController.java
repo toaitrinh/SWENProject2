@@ -1,347 +1,416 @@
 package mycontroller;
 
-import controller.CarController;
-import swen30006.driving.Simulation;
-import world.Car;
-import world.WorldSpatial;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import com.badlogic.gdx.Input;
-import tiles.GrassTrap;
-import tiles.HealthTrap;
-import tiles.LavaTrap;
-import tiles.MapTile;
-import tiles.MudTrap;
-import tiles.ParcelTrap;
-import tiles.WaterTrap;
-import utilities.Coordinate;
+import java.util.Random;
 
-public class MyAutoController extends CarController{
-	
-	// Keeps track of the map's internal representation
-	private HashMap<Coordinate, MapTile> internalMap;
-	// is true if we are following a wall
-	private boolean isFollowingWall = false;
-	// is true if we found a parcel that is obtainable
-	private boolean foundUnobstructedParcel = false;
-	Map.Entry<Coordinate,MapTile> unobstructedParcel;
-	// is true if we picked up the parcel
-	private boolean parcelObtained;
-	// remember current coordinates before getting the parcel
-	private int xBeforeGettingParcel;
-	private int yBeforeGettingParcel;
-	// Current position
-	private int xCurrentPosition;
-	private int yCurrentPosition;
-	// Keeps track of each move made when moving from wall to picking up parcel, so it is reversible
-	private ArrayList<String> movesToParcel;
-	private boolean backTracking;
-	
-	
-	// Constructor
+import controller.CarController;
+import exceptions.UnsupportedModeException;
+import swen30006.driving.Simulation;
+import tiles.MapTile;
+import utilities.Coordinate;
+import world.Car;
+import world.WorldSpatial;
+
+public class MyAutoController extends CarController {
+
+	private enum MOVEMENT {
+		FORWARD, REVERSE, STATIONARY
+	};
+
+	private Coordinate internalPosition;
+	private WorldSpatial.Direction internalOrientation;
+	private MOVEMENT internalMovement;
+	private ArrayList<String> movesToNextGoal;
+	private ArrayList<String> bestRoute;
+	private boolean movingToGoal = false;
+
 	public MyAutoController(Car car) {
 		super(car);
-		internalMap = new HashMap<Coordinate, MapTile>();
-		movesToParcel = new ArrayList<String>();
+		internalPosition = new Coordinate(getPosition());
+		internalOrientation = getOrientation();
+		internalMovement = MOVEMENT.STATIONARY;
+		setNonWallTiles();
 	}
-	
-	// Called every few milliseconds
-	public void update() {
-		// Adds newly discovered tiles to our internal map representation
-		updateInternalMap(getView());
-		
-		
-		
-		if (foundUnobstructedParcel) {
-			//System.out.println("yo");
-			handleGettingParcel();
-			updateCurrentPosition();
-			
-			if (parcelObtained) {
-				foundUnobstructedParcel = false;
-				parcelObtained = false;
-				backTracking = true;
-			}
-			//System.out.format("currentx=%d, currenty=%d\n", xCurrentPosition, yCurrentPosition);
-			//System.out.format("parcelx=%d, parcely=%d\n", unobstructedParcel.getKey().x, unobstructedParcel.getKey().y);
-			return;
-		}
-		if (backTracking == true) {
-			backTrack();
-		}
-		checkIfUnobstructedParcelAvailable();
-		
-		
-		// For testing purposes, allows user input
-		updateWithUserInput();
-		
-		// handles wall following
-		handleWallFollowing();
-		// Updates our current position
-		updateCurrentPosition();
-	}
-	
-	// Updates internal map representation as new tiles are discovered
-	public void updateInternalMap(HashMap<Coordinate, MapTile> currentView) {
-		for (Map.Entry<Coordinate,MapTile> entry : currentView.entrySet()) {
-			if (!internalMap.containsKey(entry.getKey())) {
-				internalMap.put(entry.getKey(), entry.getValue());
-			}
-		}
-	}
-	
-	
-	// For testing purposes, accepts user input
-	public void updateWithUserInput() {
-		Set<Integer> parcels = Simulation.getParcels();
-		Simulation.resetParcels();
-        for (int k : parcels){
-		     switch (k){
-		        case Input.Keys.B:
-		        	applyBrake();
-		            break;
-		        case Input.Keys.UP:
-		        	applyForwardAcceleration();
-		            break;
-		        case Input.Keys.DOWN:
-		        	applyReverseAcceleration();
-		        	break;
-		        case Input.Keys.LEFT:
-		        	turnLeft();
-		        	break;
-		        case Input.Keys.RIGHT:
-		        	turnRight();
-		        	break;
-		        default:
-		      }
-		  }
-	}
-	
-	// Returns an arraylist containing tiles of the specified type
-	public HashMap<Coordinate,MapTile> getTilesByType(String type) {
-		HashMap<Coordinate,MapTile> tiles = new HashMap<Coordinate,MapTile>();
-		
-		for (Map.Entry<Coordinate,MapTile> tile : internalMap.entrySet()) {
-			if (type.equals("grass") && tile.getClass().equals(GrassTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("health") && tile.getClass().equals(HealthTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("lava") && tile.getClass().equals(LavaTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("mud") && tile.getClass().equals(MudTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("parcel") && tile.getValue().getClass().equals(ParcelTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("water") && tile.getValue().getClass().equals(WaterTrap.class)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("wall") && tile.getValue().getType().equals(MapTile.Type.WALL)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("empty") && tile.getValue().getType().equals(MapTile.Type.EMPTY)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("start") && tile.getValue().getType().equals(MapTile.Type.START)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("road") && tile.getValue().getType().equals(MapTile.Type.ROAD)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			} else if (type.equals("finish") && tile.getValue().getType().equals(MapTile.Type.FINISH)) {
-				tiles.put(tile.getKey(), tile.getValue());
-			}
-		}
-		
-		return tiles;
-	}
-	
-	
-	private boolean checkWallAhead(){
-		switch(getOrientation()){
-		case EAST:
-			return checkDirection("east");
-		case NORTH:
-			return checkDirection("north");
-		case SOUTH:
-			return checkDirection("south");
-		case WEST:
-			return checkDirection("west");
-		default:
-			return false;
-		}
-	}
-	
 
-	private boolean checkFollowingWall() {
+	// Coordinate initialGuess;
+	// boolean notSouth = true;
+	int count = 0;
+	@Override
+	public void update() {
+		//System.out.format("%s     %s\n",getPosition(),getOrientation());
+		//System.out.format("%s     %s      %s\n",internalPosition,internalOrientation, internalMovement);
+		//System.out.println(getPossibleMoves());
+		if (movingToGoal == false) {
+			veryStupidMCTS();
+			movingToGoal = true;
+			System.out.println(bestRoute.size());
+		}
+		if (movingToGoal==true) {
+			makeGeneratedMove(bestRoute.get(count));
+			if (count == bestRoute.size()-1) {
+				movingToGoal = false;
+				count = 0;
+			}
+		}
+		// Lets get all of this logic under control
+		/*
+		if (count==0) {
+			applyReverseAcceleration();
+			makeMoveInternally("reverse");
+			System.out.println("reverse");
+		}
+		if (count==1) {
+			turnRight();
+			makeMoveInternally("right");
+			System.out.println("right");
+		}
+		if (count==2) {
+			turnRight();
+			makeMoveInternally("right");
+			System.out.println("right");
+		}
+		if (count==3) {
+			makeMoveInternally("nothing");
+			System.out.println("nothing");
+		}
+		if (count==4) {
+			makeMoveInternally("nothing");
+			System.out.println("nothing");
+		}
+		if (count==5) {
+			makeMoveInternally("nothing");
+			System.out.println("nothing");
+		}
+		if (count==6) {
+			makeMoveInternally("nothing");
+			System.out.println("nothing");
+		}
+		if (count==7) {
+			turnRight();
+			makeMoveInternally("right");
+			System.out.println("right");
+		}*/
+			
+			
+			/*
+		}
+		if (noWallTileAt(0,1)) {
+			System.out.println("no wall up");
+			for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+				if (tile.getKey().x==internalPosition.x&& tile.getKey().y==internalPosition.y+1) {
+					System.out.println(tile.getValue().getType());
+				}
+			}
+		}
+		if (noWallTileAt(0,-1)) {
+			System.out.println("no wall down");
+			for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+				if (tile.getKey().x==internalPosition.x&& tile.getKey().y==internalPosition.y-1) {
+					System.out.println(tile.getKey());
+					System.out.println(tile.getValue().getType());
+				}
+			}
+		}
+		if (noWallTileAt(1,0)) {
+			System.out.println("no wall right");
+			for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+				if (tile.getKey().x==internalPosition.x+1 && tile.getKey().y==internalPosition.y) {
+					System.out.println(tile.getKey());
+					System.out.println(tile.getValue().getType());
+				}
+			}
+		}
+		if (noWallTileAt(-1,0)) {
+			System.out.println("no wall left");
+			for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+				if (tile.getKey().x==internalPosition.x-1 && tile.getKey().y==internalPosition.y) {
+					System.out.println(tile.getKey());
+					System.out.println(tile.getValue().getType());
+				}
+			}
+		}*/
 		
-		switch(getOrientation()){
-		case EAST:
-			return checkDirection("north");
-		case NORTH:
-			return checkDirection("west");
-		case SOUTH:
-			return checkDirection("east");
-		case WEST:
-			return checkDirection("south");
-		default:
-			return false;
-		}	
+		count++;
+		/*
+		if (movingToGoal == false) {
+			veryStupidMCTS();
+			movingToGoal = true;
+			System.out.println(bestRoute.size());
+		}
+		if (movingToGoal == true) {
+			String nextMove = bestRoute.get(0);
+			if (nextMove.equals("forward")) {
+				applyForwardAcceleration();
+			} else if (nextMove.equals("reverse")) {
+				applyReverseAcceleration();
+			} else if (nextMove.equals("left")) {
+				turnLeft();
+			} else if (nextMove.equals("right")) {
+				turnRight();
+			}
+			bestRoute.remove(0);
+			System.out.println(nextMove);
+		}
+		if (bestRoute.size() == 0) {
+			movingToGoal = false;
+		}*/
+	}
+
+	public HashMap<Coordinate, MapTile> getAdjacentTiles() {
+		HashMap<Coordinate, MapTile> adjacentTiles = new HashMap<Coordinate, MapTile>();
+		for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+			if ((internalPosition.x == tile.getKey().x && Math.abs(internalPosition.y - tile.getKey().y) == 1)
+					|| (internalPosition.y == tile.getKey().y && Math.abs(internalPosition.x - tile.getKey().x) == 1)) {
+				adjacentTiles.put(tile.getKey(), tile.getValue());
+			}
+		}
+		return adjacentTiles;
+	}
+
+	HashMap<Coordinate, MapTile> nonWallTiles;
+
+	public void setNonWallTiles() {
+		nonWallTiles = new HashMap<Coordinate, MapTile>();
+		for (Map.Entry<Coordinate, MapTile> tile : getMap().entrySet()) {
+			if (!tile.getValue().isType(MapTile.Type.WALL)) {
+				nonWallTiles.put(tile.getKey(), tile.getValue());
+			}
+		}
+	}
+
+	public boolean noWallTileAt(int x, int y) {
+		for (Coordinate coord : nonWallTiles.keySet()) {
+			if ((coord.x == internalPosition.x + x) && (coord.y == internalPosition.y + y)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// returns possible moves based on tileType, orientation, direction of movement
+	public ArrayList<String> getPossibleMoves() {
+		ArrayList<String> possibleMoves = new ArrayList<String>();
+
+		if (internalMovement == MOVEMENT.STATIONARY) {
+			if (internalOrientation == WorldSpatial.Direction.NORTH) {
+				if (noWallTileAt(0, 1)) {possibleMoves.add("forward");}
+				if (noWallTileAt(0, -1)) {possibleMoves.add("reverse");}
+			} else if (internalOrientation == WorldSpatial.Direction.SOUTH) {
+				if (noWallTileAt(0, -1)) {possibleMoves.add("forward");}
+				if (noWallTileAt(0, 1)) {possibleMoves.add("reverse");}
+			} else if (internalOrientation == WorldSpatial.Direction.EAST) {
+				if (noWallTileAt(1, 0)) {possibleMoves.add("forward");}
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("reverse");}
+			} else if (internalOrientation == WorldSpatial.Direction.WEST) {
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("forward");}
+				if (noWallTileAt(1, 0)) {possibleMoves.add("reverse");}
+			}
+		} else if (internalMovement == MOVEMENT.FORWARD) {
+			possibleMoves.add("reverse");
+			if (internalOrientation == WorldSpatial.Direction.NORTH) {
+				if (noWallTileAt(0, 1) && noWallTileAt(0,2)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("left");}
+				if (noWallTileAt(1, 0)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.SOUTH) {
+				if (noWallTileAt(0, -1) && noWallTileAt(0,-2)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(1, 0)) {possibleMoves.add("left");}
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.EAST) {
+				if (noWallTileAt(1, 0) && noWallTileAt(2,0)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(0, 1)) {possibleMoves.add("left");}
+				if (noWallTileAt(0, -1)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.WEST) {
+				if (noWallTileAt(-1, 0) && noWallTileAt(-2,0)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(0, -1)) {possibleMoves.add("left");}
+				if (noWallTileAt(0, 1)) {possibleMoves.add("right");}
+			}
+		} else if (internalMovement == MOVEMENT.REVERSE) {
+			possibleMoves.add("forward");
+			if (internalOrientation == WorldSpatial.Direction.NORTH) {
+				if (noWallTileAt(0, -1) && noWallTileAt(0, -2)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("left");}
+				if (noWallTileAt(1, 0)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.SOUTH) {
+				if (noWallTileAt(0, 1) && noWallTileAt(0, 2)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(1, 0)) {possibleMoves.add("left");}
+				if (noWallTileAt(-1, 0)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.EAST) {
+				if (noWallTileAt(-1, 0) && noWallTileAt(-2,0)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(0, 1)) {possibleMoves.add("left");}
+				if (noWallTileAt(0, -1)) {possibleMoves.add("right");}
+			} else if (internalOrientation == WorldSpatial.Direction.WEST) {
+				if (noWallTileAt(1, 0) && noWallTileAt(2,0)) {possibleMoves.add("nothing");}
+				if (noWallTileAt(0, -1)) {possibleMoves.add("left");}
+				if (noWallTileAt(0, 1)) {possibleMoves.add("right");}
+			}
+		}
+		return possibleMoves;
+	}
+
+	public void veryStupidMCTS() {
+		
+		Random random = new Random();
+		String nextMove;
+		ArrayList<String> possibleMoves;
+		movesToNextGoal = new ArrayList<String>();
+		int shortestPath = 999999;
+		int count = 0;
+		int minDamageTaken = 999999;
+		MOVEMENT oldMovement = internalMovement;
+
+		while (count < 10000) {
+			internalPosition = new Coordinate(getPosition());
+			internalOrientation = getOrientation();
+			internalMovement = oldMovement;
+			movesToNextGoal = new ArrayList<String>();
+			int damageTaken = 0;
+			p1NotFound = true;
+			p2NotFound = true;
+			p3NotFound = true;
+			p4NotFound = true;
+			while (!packageFound()) { // if a path gets really long just abandon it
+				possibleMoves = getPossibleMoves();
+				if (possibleMoves.contains("nothing")) {
+					for (int i=0; i<4; i++) {
+						possibleMoves.add("nothing");
+					}
+				}
+				nextMove = possibleMoves.get(random.nextInt(possibleMoves.size()));
+				makeMoveInternally(nextMove);
+				movesToNextGoal.add(nextMove);
+			}
+			if (damageTaken < minDamageTaken && movesToNextGoal.size() < shortestPath) {
+				shortestPath = movesToNextGoal.size();
+				minDamageTaken = damageTaken;
+				bestRoute = movesToNextGoal;
+			}
+			count++;
+		}
+		internalPosition = new Coordinate(getPosition());
+		internalOrientation = getOrientation();
+		internalMovement = oldMovement;
+		movingToGoal = true;
+
 	}
 	
+	public void updateInternals(int x, int y) {
+		internalPosition.x += x;
+		internalPosition.y += y;
+	}
 	
-	public boolean checkDirection(String direction) {
-		Coordinate currentPosition = new Coordinate(getPosition());
-		
-		MapTile tile;
-		if (direction.equals("east")) {
-			tile = internalMap.get(new Coordinate(currentPosition.x+1, currentPosition.y));
-		} else if (direction.equals("west")) {
-			tile = internalMap.get(new Coordinate(currentPosition.x-1, currentPosition.y));
-		} else if (direction.equals("north")) {
-			tile = internalMap.get(new Coordinate(currentPosition.x, currentPosition.y+1));
-		} else {
-			tile = internalMap.get(new Coordinate(currentPosition.x, currentPosition.y-1));
+	public void updateInternals(int x, int y, WorldSpatial.Direction direction) {
+		internalPosition.x += x;
+		internalPosition.y += y;
+		internalOrientation = direction;
+	}
+	public void updateInternals(MOVEMENT movement) {
+		internalMovement = movement;
+	}
+	boolean p1NotFound = true;
+	boolean p2NotFound = true;
+	boolean p3NotFound = true;
+	boolean p4NotFound = true;
+	private boolean packageFound() {
+		if (internalPosition.x==19 && internalPosition.y==2 && p1NotFound) {
+			p1NotFound = false;
+			return true;
 		}
-		
-		
-		if(tile.isType(MapTile.Type.WALL) || tile.getClass().equals(LavaTrap.class)){
+		if (internalPosition.x==5 && internalPosition.y==15 && p2NotFound) {
+			p2NotFound = false;
+			return true;
+		}
+		if (internalPosition.x==16 && internalPosition.y==13 && p3NotFound) {
+			p3NotFound = false;
+			return true;
+		}
+		if (internalPosition.x==23 && internalPosition.y==15 && p4NotFound) {
+			p4NotFound = false;
 			return true;
 		}
 		
 		return false;
 	}
 	
-	
-	public void handleWallFollowing() {
-		if(getSpeed() < 1){       // Need speed to turn and progress toward the exit
-			applyForwardAcceleration();   // Tough luck if there's a wall in the way
-		}
-		if (isFollowingWall) {
-			// If wall no longer on left, turn left
-			if(!checkFollowingWall()) {
-				turnLeft();
-			} else {
-				// If wall on left and wall straight ahead, turn right
-				if(checkWallAhead()) {
-					turnRight();
-				}
+	public void makeMoveInternally(String move) {
+		WorldSpatial.Direction NORTH = WorldSpatial.Direction.NORTH;
+		WorldSpatial.Direction SOUTH = WorldSpatial.Direction.SOUTH;
+		WorldSpatial.Direction EAST = WorldSpatial.Direction.EAST;
+		WorldSpatial.Direction WEST = WorldSpatial.Direction.WEST;
+		MOVEMENT FORWARD = MOVEMENT.FORWARD;
+		MOVEMENT REVERSE = MOVEMENT.REVERSE;
+		MOVEMENT STATIONARY = MOVEMENT.STATIONARY;
+		
+		if (internalMovement == STATIONARY) {
+			if (internalOrientation == NORTH) {
+				if 		(move.equals("forward")) {updateInternals(0,1); updateInternals(FORWARD);} 
+				else if (move.equals("reverse")) {updateInternals(0,-1);updateInternals(REVERSE);} 
+			} else if (internalOrientation == SOUTH) {
+				if 		(move.equals("forward")) {updateInternals(0,-1);updateInternals(FORWARD);} 
+				else if (move.equals("reverse")) {updateInternals(0,1);updateInternals(REVERSE);} 
+			} else if (internalOrientation == EAST) {
+				if 		(move.equals("forward")) {updateInternals(1,0);updateInternals(FORWARD);} 
+				else if (move.equals("reverse")) {updateInternals(-1,0);updateInternals(REVERSE);} 
+			} else if (internalOrientation == WEST) {
+				if 		(move.equals("forward")) {updateInternals(-1,0);updateInternals(FORWARD);} 
+				else if (move.equals("reverse")) {updateInternals(1,0);updateInternals(REVERSE);} 
 			}
-		} else {
-			// Start wall-following (with wall on left) as soon as we see a wall straight ahead
-			if(checkWallAhead()) {
-				turnRight();
-				isFollowingWall = true;
+		} else if (internalMovement == FORWARD) {
+			if (move.equals("reverse")) {
+				updateInternals(STATIONARY);
+			} else if (internalOrientation == NORTH) {
+				if 		(move.equals("nothing")) {updateInternals(0,1,NORTH);} 
+				else if (move.equals("left")) {updateInternals(-1,0,WEST);} 
+				else if (move.equals("right")) {updateInternals(1,0,EAST);}
+			} else if (internalOrientation == SOUTH) {
+				if 		(move.equals("nothing")) {updateInternals(0,-1,SOUTH);} 
+				else if (move.equals("left")) {updateInternals(1,0,EAST);} 
+				else if (move.equals("right")) {updateInternals(-1,0,WEST);}
+			} else if (internalOrientation == EAST) {
+				if 		(move.equals("nothing")) {updateInternals(1,0,EAST);} 
+				else if (move.equals("left")) {updateInternals(0,1,NORTH);} 
+				else if (move.equals("right")) {updateInternals(0,-1,SOUTH);}
+			} else if (internalOrientation == WEST) {
+				if 		(move.equals("nothing")) {updateInternals(-1,0,WEST);} 
+				else if (move.equals("left")) {updateInternals(0,-1,SOUTH);} 
+				else if (move.equals("right")) {updateInternals(0,1,NORTH);}
+			}
+		} else if (internalMovement == REVERSE) {
+			if (move.equals("forward")) {
+				updateInternals(STATIONARY);
+			} else if (internalOrientation == NORTH) {
+				if		(move.equals("nothing")) {updateInternals(0,-1,NORTH);} 
+				else if (move.equals("left")) {updateInternals(-1,0,EAST);} 
+				else if (move.equals("right")) {updateInternals(1,0,WEST);}
+			} else if (internalOrientation == SOUTH) {
+				if 		(move.equals("nothing")) {updateInternals(0,1,SOUTH);} 
+				else if (move.equals("left")) {updateInternals(1,0,WEST);} 
+				else if (move.equals("right")) {updateInternals(-1,0,EAST);}
+			} else if (internalOrientation == EAST) {
+				if 		(move.equals("nothing")) {updateInternals(-1,0,EAST);} 
+				else if (move.equals("left")) {updateInternals(0,1,SOUTH);} 
+				else if (move.equals("right")) {updateInternals(0,-1,NORTH);}
+			} else if (internalOrientation == WEST) {
+				if 		(move.equals("nothing")) {updateInternals(1,0,WEST);} 
+				else if (move.equals("left")) {updateInternals(0,-1,NORTH);} 
+				else if (move.equals("right")) {updateInternals(0,1,SOUTH);}
 			}
 		}
 	}
 	
-	// Updates our current position
-	public void updateCurrentPosition() {
-		Coordinate currentPosition = new Coordinate(getPosition());
-		xCurrentPosition = currentPosition.x;
-		yCurrentPosition = currentPosition.y;
-	}
-	
-	//
-	public void checkIfUnobstructedParcelAvailable() {
-		// If we havent even found a parcel yet, no point in proceeding
-		HashMap<Coordinate,MapTile> parcels = getTilesByType("parcel");
-		
-		if (parcels.entrySet().size() == 0) {
-			foundUnobstructedParcel = false;
-			return;
-		}
-		
-		// updates in case we need to start finding the parcel, and then return to this position later
-		Coordinate currentPosition = new Coordinate(getPosition());
-		int xCurrentPosition = currentPosition.x;
-		int yCurrentPosition = currentPosition.y;
-		xBeforeGettingParcel = xCurrentPosition;
-		yBeforeGettingParcel = yCurrentPosition;
-		
-		HashMap<Coordinate,MapTile> badTiles = getTilesByType("lava");
-		badTiles.putAll(getTilesByType("wall"));
-		
-		// The difference between current position and parcel position
-		for (Map.Entry<Coordinate,MapTile> parcel : parcels.entrySet()) {
-			// Difference between my current position and the parcel's position
-			int xDiff = parcel.getKey().x - xCurrentPosition;
-			int yDiff = parcel.getKey().y - yCurrentPosition;
-			System.out.format("xDiff=%d, yDiff=%d\n", xDiff, yDiff);
-			// if a wall or lava tile comes between us, return False
-			for (Map.Entry<Coordinate,MapTile> badTile : badTiles.entrySet()) {
-				if (xCurrentPosition==badTile.getKey().x && Math.abs(yCurrentPosition-badTile.getKey().y) <= yDiff ||
-						yCurrentPosition==badTile.getKey().y && Math.abs(xCurrentPosition-badTile.getKey().x) <= xDiff) {
-					foundUnobstructedParcel = false;
-					return;
-				}
-			}
-			unobstructedParcel = parcel;
-			break;
-		}
-		//System.out.format("parcelx=%d, parcely=%d", unobstructedParcel.getKey().x, unobstructedParcel.getKey().y);
-		foundUnobstructedParcel = true;
-		
-	}
-	
-	// 
-	public void handleGettingParcel() {
-		
-		Coordinate currentPosition = new Coordinate(getPosition());
-		int xCurrentPosition = currentPosition.x;
-		int yCurrentPosition = currentPosition.y;
-		
-		// difference between current position and parcel position tells us where to go
-		int xDiff = unobstructedParcel.getKey().x - xCurrentPosition;
-		int yDiff = unobstructedParcel.getKey().y - yCurrentPosition;
-		System.out.format("xDiff=%d, yDiff=%d\n", xDiff, yDiff);
-		//System.out.format("xcurrentPosition=%d, yCurrentPosition=%d\n", xCurrentPosition, yCurrentPosition);
-		//System.out.println(getOrientation().toString());
-		
-		// Make sure I'm oriented towards the parcel
-		WorldSpatial.Direction requiredOrientation = null;
-		if (xDiff==0 && yDiff>0) {
-			requiredOrientation = WorldSpatial.Direction.NORTH;
-		} else if (xDiff==0 && yDiff<0) {
-			requiredOrientation = WorldSpatial.Direction.SOUTH;
-		} else if (yDiff==0 && xDiff>0) {
-			requiredOrientation = WorldSpatial.Direction.EAST;
-		} else if (yDiff==0 && xDiff<0) {
-			requiredOrientation = WorldSpatial.Direction.WEST;
-		}
-		
-		// If we are not at the required orientation, make a turn
-		System.out.format("orientation= %s,   requiredOrientation= %s\n", getOrientation(), requiredOrientation);
-		if (!getOrientation().equals(requiredOrientation)) {
-			turnRight();
-			movesToParcel.add("right");
-		}
-		
-		if (xDiff==0 && Math.abs(yDiff)>0) {
-			applyForwardAcceleration();
-			movesToParcel.add("forward");
-		}/* else if (xDiff==0 && yDiff<0) {
-			applyReverseAcceleration();
-		}*/ else if (yDiff==0 && Math.abs(xDiff)>0) {
-			applyForwardAcceleration();
-			movesToParcel.add("forward");
-		}/* else if (yDiff==0 && xDiff<0) {
-			applyReverseAcceleration();
-		} */else if (xDiff==0 && yDiff==0) {
-			parcelObtained = true;
-			internalMap.remove(unobstructedParcel);
-			unobstructedParcel = null;
-		}
-	}
-	
-	public void backTrack() {
-		if (movesToParcel.size() == 0) {
-			backTracking = false;
-			return;
-		}
-		String move = movesToParcel.get(movesToParcel.size()-1);
+	public void makeGeneratedMove(String move) {
 		if (move.equals("forward")) {
+			applyForwardAcceleration();
+		} else if (move.equals("reverse")) {
 			applyReverseAcceleration();
-		} else if (move.equals("right")) {
+		} else if (move.equals("left")) {
 			turnLeft();
+		} else if (move.equals("right")) {
+			turnRight();
 		}
-	}	
+		
+		makeMoveInternally(move);
+		System.out.println(move);
+	}
 }
