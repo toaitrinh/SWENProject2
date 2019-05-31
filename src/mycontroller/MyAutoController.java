@@ -7,6 +7,7 @@ import world.WorldSpatial;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 
 import tiles.MapTile;
 import tiles.TrapTile;
@@ -31,7 +32,7 @@ public class MyAutoController extends CarController{
 		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
 		private ArrayList<Coordinate> lava = new ArrayList<Coordinate>();
-		private ArrayList<Coordinate> health = new ArrayList<Coordinate>();
+		private LinkedList<Coordinate> health = new LinkedList<Coordinate>();
 		//private ArrayList<Coordinate> ice = new ArrayList<Coordinate>();
 		
 		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
@@ -53,6 +54,14 @@ public class MyAutoController extends CarController{
 		
 		public ArrayList<Coordinate> getParcels() {
 			return parcels;
+		}
+		
+		public ArrayList<Coordinate> getLava() {
+			return lava;
+		}
+		
+		public LinkedList<Coordinate> getHealthTiles() {
+			return health;
 		}
 		
 		public ArrayList<Coordinate> getExit() {
