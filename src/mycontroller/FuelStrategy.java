@@ -16,13 +16,14 @@ public class FuelStrategy implements CarStrategy{
 		// parents is a map of parent nodes to child nodes
 		HashMap<Coordinate, Coordinate> parents = new HashMap<Coordinate, Coordinate>();
 		// hardcoded parcels in
-		Coordinate[] parcels = new Coordinate[4];
-		parcels[0] = new Coordinate("5,15");
-		parcels[1] = new Coordinate("19,2");
-	    parcels[2] = new Coordinate("16,13");
-		parcels[3] = new Coordinate("23,15");
-		Coordinate exit = new Coordinate("23,16");
+//		Coordinate[] parcels = new Coordinate[4];
+//		parcels[0] = new Coordinate("5,15");
+//		parcels[1] = new Coordinate("19,2");
+//	    parcels[2] = new Coordinate("16,13");
+//		parcels[3] = new Coordinate("23,15");
+		Coordinate exit = car.getExit().get(0);
 		
+		ArrayList<Coordinate> travelled = car.getTravelled();
 		// order is used for coordinate order we have to traverse in order to be fuel efficient
 		LinkedList<Coordinate> order = new LinkedList<Coordinate>();
 		// distance is just a guide for order
@@ -30,49 +31,39 @@ public class FuelStrategy implements CarStrategy{
 		// calculate distance from parcels to exit
 		LinkedList<Coordinate> path = new LinkedList<Coordinate>();
 		int[] d = new int[4];
-		for (int i = 0; i < 4; i++) {
-			d[i] = bfs(parcels[i], exit, parents, path);
+		for (int i = 0; i < car.getParcels().size(); i++) {
+			d[i] = bfs(car.getParcels().get(i), exit, parents, path);
 		}
 		// sort the parcels in order
-		order.add(parcels[0]);
-		distance.add(d[0]);
-		for (int k = 1; k < 4; k++) {
-			int m = 0;
-			while (d[k] < d[m]) {
-				m++;
+		if (car.getParcels().size() > 0) {
+			order.add(car.getParcels().get(0));
+			distance.add(d[0]);
+			for (int k = 1; k < car.getParcels().size(); k++) {
+				int m = 0;
+				while (d[k] > d[m]) {
+					m++;
+				}
+				if (!travelled.contains(car.getParcels().get(k))) {
+					order.add(m, car.getParcels().get(k));
+					distance.add(m, d[k]);
+				}
 			}
-			order.add(m, parcels[k]);
-			distance.add(m, d[k]);
 		}
 		
-		System.out.printf("d1 = %d, d2 = %d, d3 = %d, d4 = %d\n", d[0], d[1], d[2], d[3]);
-		System.out.printf("distance in order is %d %d %d %d\n", distance.get(0),
-				distance.get(1), distance.get(2), distance.get(3));
-		System.out.printf("Coordinates in order are %s %s %s %s\n" , order.get(3).toString(),
-				order.get(2).toString(), order.get(1).toString(), order.get(0).toString());
 		
 		// This is just a trial run to get from one place to another
 		// Not yet implemented the remaining parts of going through all the parcels then the exit
 		// bfs through car to first parcel so that we can get a node of parents along that path
 		Coordinate carPos = new Coordinate(car.getPosition());
 		if (car.numParcelsFound() >= car.numParcels()) {
-			System.out.println("FOUND ALL REQUIRED PARCELS\n");
 			path = new LinkedList<Coordinate>();
 			bfs(carPos, exit, parents, path);
-			for (Coordinate tile : path) {
-				System.out.printf("%s, ", tile.toString());
-			}
-			System.out.printf("\n");
 			go(car, exit, parents, path);
 		} else {
 			path = new LinkedList<Coordinate>();
-			bfs(carPos, order.get(order.size() - car.numParcels() + car.numParcelsFound()), parents, path);
-			for (Coordinate tile : path) {
-				System.out.printf("(%s), ", tile.toString());
-			}
-			System.out.printf("\n");
+			bfs(carPos, order.get(0), parents, path);
 			// execute movement along that path
-			go(car, order.get(order.size() - car.numParcels() + car.numParcelsFound()), parents, path);
+			go(car, order.get(0), parents, path);
 		}
 	}
 	
@@ -211,11 +202,13 @@ public class FuelStrategy implements CarStrategy{
 		path.add(end);
 		while (!(main.x == start.x && main.y == start.y)) {
 			Coordinate temp2 = parents.get(main);
-			if (!(temp2.x == start.x && temp2.y == start.y)) {
-				path.add(temp2);
+			if (temp2 != null) {
+				if (!(temp2.x == start.x && temp2.y == start.y)) {
+					path.add(temp2);
+				}
+				main.x = temp2.x;
+				main.y = temp2.y;
 			}
-			main.x = temp2.x;
-			main.y = temp2.y;
 		}
 		
 		

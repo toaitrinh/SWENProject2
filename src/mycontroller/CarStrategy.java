@@ -1,5 +1,5 @@
 package mycontroller;
 
 public interface CarStrategy {
-	public void update();
+	public void update(MyAutoController car);
 }

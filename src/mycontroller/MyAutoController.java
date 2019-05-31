@@ -31,6 +31,8 @@ public class MyAutoController extends CarController{
 		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
 		
+		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
+		
 		private CarStrategy strategy; 
 		
 		private static Simulation.StrategyMode mode;
@@ -44,6 +46,18 @@ public class MyAutoController extends CarController{
 				
 		public Simulation.StrategyMode getMode() {
 			return mode;
+		}
+		
+		public ArrayList<Coordinate> getParcels() {
+			return parcels;
+		}
+		
+		public ArrayList<Coordinate> getExit() {
+			return exit;
+		}
+		
+		public ArrayList<Coordinate> getTravelled() {
+			return travelled;
 		}
 		
 		// Updates internal map representation as new tiles are discovered
@@ -78,30 +92,56 @@ public class MyAutoController extends CarController{
 		public void update() {
 			if (phase.equals("explore")) {
 				updateMap(getView());
-				
 				// checkStateChange();
 				if(getSpeed() < CAR_MAX_SPEED){       // Need speed to turn and progress toward the exit
 					applyForwardAcceleration();   // Tough luck if there's a wall in the way
 				}
 				if (isFollowingWall) {
 					// If wall no longer on left, turn left
-					if(!checkFollowingWall(getOrientation(), map)) {
-						turnLeft();
+					if (travelled.contains(new Coordinate(getPosition()))) {
+						isFollowingWall = false;
 					} else {
-						// If wall on left and wall straight ahead, turn right
-						if(checkWallAhead(getOrientation(), map)) {
-							turnRight();
+						if(!checkFollowingWall(getOrientation(), map)) {
+							turnLeft();
+						} else {
+							// If wall on left and wall straight ahead, turn right
+							if(checkWallAhead(getOrientation(), map)) {
+								if (!checkWallRight(getOrientation(), map))	{
+									turnRight();
+									isFollowingWall = true;
+								} else if (!checkWallLeft(getOrientation(), map)){
+									turnLeft();
+								} else {
+									applyReverseAcceleration();
+								}
+							}
+						}
+						Coordinate tempcoord = new Coordinate(getPosition());
+						travelled.add(tempcoord);
+						if (parcels.contains(tempcoord)) {
+							parcels.remove(tempcoord);
 						}
 					}
 				} else {
 					// Start wall-following (with wall on left) as soon as we see a wall straight ahead
 					if(checkWallAhead(getOrientation(), map)) {
-						turnRight();
-						isFollowingWall = true;
+						if (!checkWallRight(getOrientation(), map))	{
+							turnRight();
+							isFollowingWall = true;
+						} else if (!checkWallLeft(getOrientation(), map)){
+							turnLeft();
+						} else {
+							applyReverseAcceleration();
+						}
 					}
 				}
 			} else {
-				strategy.update();
+				strategy.update(this);
+				Coordinate tempcoord = new Coordinate(getPosition());
+				travelled.add(tempcoord);
+				if (parcels.contains(tempcoord)) {
+					parcels.remove(tempcoord);
+				}
 			}
 		}
 
@@ -126,6 +166,35 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		private boolean checkWallRight(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView){
+			switch(orientation){
+			case EAST:
+				return checkSouth(currentView);
+			case NORTH:
+				return checkEast(currentView);
+			case SOUTH:
+				return checkWest(currentView);
+			case WEST:
+				return checkNorth(currentView);
+			default:
+				return false;
+			}
+		}
+		
+		private boolean checkWallLeft(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView){
+			switch(orientation){
+			case EAST:
+				return checkNorth(currentView);
+			case NORTH:
+				return checkWest(currentView);
+			case SOUTH:
+				return checkEast(currentView);
+			case WEST:
+				return checkSouth(currentView);
+			default:
+				return false;
+			}
+		}
 		/**
 		 * Check if the wall is on your left hand side given your orientation
 		 * @param orientation
@@ -168,6 +237,16 @@ public class MyAutoController extends CarController{
 			return false;
 		}
 		
+		public boolean isLava(MapTile tile) {
+			if (tile.isType(MapTile.Type.TRAP)) {
+				TrapTile tile2 = (TrapTile) tile;
+				if (tile2.getTrap().equals("lava")) {
+					return true;
+				}
+			}
+			return false;
+		}
+		
 		public boolean checkWest(HashMap<Coordinate,MapTile> currentView){
 			// Check tiles to my left
 			Coordinate currentPosition = new Coordinate(getPosition());
@@ -202,19 +281,5 @@ public class MyAutoController extends CarController{
 				}
 			}
 			return false;
-		}
-		 
-		
-		
-//		@Override
-//		public void update() {
-//			// Gets what the car can see
-//			HashMap<Coordinate, MapTile> currentView = getView();
-//			
-//			strategy.update();
-//			
-//		}
-
-		
-		
+		}		
 	}
