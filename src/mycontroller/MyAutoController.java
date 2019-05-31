@@ -30,6 +30,9 @@ public class MyAutoController extends CarController{
 		private boolean exitFound = false;
 		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
+		private ArrayList<Coordinate> lava = new ArrayList<Coordinate>();
+		private ArrayList<Coordinate> health = new ArrayList<Coordinate>();
+		//private ArrayList<Coordinate> ice = new ArrayList<Coordinate>();
 		
 		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
 		
@@ -74,6 +77,10 @@ public class MyAutoController extends CarController{
 							if (parcelsFound == numParcels() && exitFound == true) {
 								phase = "search";
 							}
+						} else if (value2.getTrap().equals("lava")) {
+							lava.add(key);
+						} else if (value2.getTrap().equals("health") || value2.getTrap().equals("water")) {
+							health.add(key);
 						}
 					} else if (value.getType() == MapTile.Type.FINISH) {
 						exitFound = true;
@@ -81,7 +88,7 @@ public class MyAutoController extends CarController{
 						if (parcelsFound == numParcels() && exitFound == true) {
 							phase = "search";
 						}
-					}
+					} 
 				}
 			}
 		}
