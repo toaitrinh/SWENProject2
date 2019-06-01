@@ -15,12 +15,7 @@ public class FuelStrategy implements CarStrategy{
 		// TODO Auto-generated method stub
 		// parents is a map of parent nodes to child nodes
 		HashMap<Coordinate, Coordinate> parents = new HashMap<Coordinate, Coordinate>();
-		// hardcoded parcels in
-//		Coordinate[] parcels = new Coordinate[4];
-//		parcels[0] = new Coordinate("5,15");
-//		parcels[1] = new Coordinate("19,2");
-//	    parcels[2] = new Coordinate("16,13");
-//		parcels[3] = new Coordinate("23,15");
+
 		Coordinate exit = car.getExit().get(0);
 		
 		ArrayList<Coordinate> travelled = car.getTravelled();
@@ -58,16 +53,16 @@ public class FuelStrategy implements CarStrategy{
 		if (car.numParcelsFound() >= car.numParcels()) {
 			path = new LinkedList<Coordinate>();
 			bfs(carPos, exit, parents, path);
-			go(car, exit, parents, path);
+			go(car, exit, path);
 		} else {
 			path = new LinkedList<Coordinate>();
 			bfs(carPos, order.get(0), parents, path);
 			// execute movement along that path
-			go(car, order.get(0), parents, path);
+			go(car, order.get(0), path);
 		}
 	}
 	
-	public void go(MyAutoController car, Coordinate dest, HashMap<Coordinate, Coordinate> parents, LinkedList<Coordinate> path) {
+	public void go(MyAutoController car, Coordinate dest, LinkedList<Coordinate> path) {
 		Coordinate currentPos = new Coordinate(car.getPosition());
 		//Coordinate nextPos = parents.get(currentPos);
 		Coordinate nextPos = path.getLast();

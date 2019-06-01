@@ -97,6 +97,7 @@ public class MyAutoController extends CarController{
 			updateResources(tempcoord);
 		}
 		
+		// creates a list of all possible tiles that we can move to
 		public ArrayList<Coordinate> possibleTiles(Coordinate start) {
 			HashMap<Coordinate, MapTile> wallMap = World.getMap();
 			LinkedList<Coordinate> queue = new LinkedList<Coordinate>();
@@ -198,7 +199,7 @@ public class MyAutoController extends CarController{
 				// Start wall-following (with wall on left) as soon as we see a wall straight ahead
 				if(checkWallAhead(getOrientation(), map)) {
 					if (!checkWallRight(getOrientation(), map) && !checkWallLeft(getOrientation(), map)) {
-						// implementing some randomness so doesnt get stuck in loop
+						// implementing some randomness so doesn't get stuck in loop
 						Random rand = new Random();
 						int n = rand.nextInt(2);
 						if (n==0) {
