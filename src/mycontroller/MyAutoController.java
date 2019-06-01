@@ -3,6 +3,7 @@ package mycontroller;
 import controller.CarController;
 import swen30006.driving.Simulation;
 import world.Car;
+import world.World;
 import world.WorldSpatial;
 
 import java.util.ArrayList;
@@ -39,6 +40,8 @@ public class MyAutoController extends CarController{
 		private LinkedList<Coordinate> water = new LinkedList<Coordinate>();
 		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
 		
+		private ArrayList<Coordinate> possibleTiles;
+		
 		private CarStrategy strategy; 
 		
 		private static Simulation.StrategyMode mode;
@@ -46,6 +49,7 @@ public class MyAutoController extends CarController{
 		public MyAutoController(Car car) {
 			super(car);
 			mode = Simulation.toConserve();
+			possibleTiles = possibleTiles(new Coordinate(getPosition()));
 			// use the factory method to find a strategy
 			strategy = CarStrategyFactory.getInstance().getStrategy(this);
 		}
@@ -78,6 +82,51 @@ public class MyAutoController extends CarController{
 			return travelled;
 		}
 		
+		@Override
+		public void update() {
+			updateMap(getView());
+			// if currently in explore phase
+			if (phase.equals("explore")) {
+				explore();
+			} else {
+				strategy.update(this);
+			}
+			Coordinate tempcoord = new Coordinate(getPosition());
+			travelled.add(tempcoord);
+			updateResources(tempcoord);
+		}
+		
+		public ArrayList<Coordinate> possibleTiles(Coordinate start) {
+			HashMap<Coordinate, MapTile> wallMap = World.getMap();
+			LinkedList<Coordinate> queue = new LinkedList<Coordinate>();
+			ArrayList<Coordinate> visited = new ArrayList<Coordinate>();
+			queue.add(start);
+			while (!queue.isEmpty()) {
+				Coordinate next = queue.poll();
+				for (int i = 0; i < 4; i++) {
+					switch(i) {
+					case 0:
+						next.y--;
+						break;
+					case 1:
+						next.x++;
+						break;
+					case 2:
+						next.y++;
+						break;
+					case 3:
+						next.x--;
+						break;
+					}
+					if (!visited.contains(next) && !wallMap.get(next).isType(MapTile.Type.WALL)) {
+						queue.add(next);
+						visited.add(next);
+					}
+				}
+			}
+			return visited;
+		}
+		
 		// Updates internal map representation as new tiles are discovered
 		public void updateMap(HashMap<Coordinate, MapTile> currentView) {
 			for (Coordinate key : currentView.keySet()) {
@@ -86,7 +135,7 @@ public class MyAutoController extends CarController{
 					map.put(key, value);
 					if (value.getType() == MapTile.Type.TRAP) {
 						TrapTile value2 = (TrapTile) value;
-						if (value2.getTrap().equals("parcel")) {
+						if (value2.getTrap().equals("parcel") && possibleTiles.contains(key)) {
 							parcelsFound++;
 							parcels.add(key);
 							if (parcelsFound == numParcels() && exitFound == true) {
@@ -105,7 +154,7 @@ public class MyAutoController extends CarController{
 						if (parcelsFound == numParcels() && exitFound == true) {
 							phase = "search";
 						}
-					} 
+					}
 				}
 			}
 		}
@@ -116,20 +165,6 @@ public class MyAutoController extends CarController{
 			} else if (water.contains(coord)) {
 				water.remove(coord);
 			}
-		}
-		
-		@Override
-		public void update() {
-			updateMap(getView());
-			// if currently in explore phase
-			if (phase.equals("explore")) {
-				explore();
-			} else {
-				strategy.update(this);
-			}
-			Coordinate tempcoord = new Coordinate(getPosition());
-			travelled.add(tempcoord);
-			updateResources(tempcoord);
 		}
 		
 		public void explore() {
