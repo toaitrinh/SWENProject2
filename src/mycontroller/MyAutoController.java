@@ -66,6 +66,10 @@ public class MyAutoController extends CarController{
 			return health;
 		}
 		
+		public LinkedList<Coordinate> getWaterTiles() {
+			return water;
+		}
+		
 		public ArrayList<Coordinate> getExit() {
 			return exit;
 		}
@@ -114,8 +118,6 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
-		// Coordinate initialGuess;
-		// boolean notSouth = true;
 		@Override
 		public void update() {
 			updateMap(getView());
