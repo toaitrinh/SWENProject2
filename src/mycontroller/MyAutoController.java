@@ -7,6 +7,7 @@ import world.WorldSpatial;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 
 import tiles.MapTile;
 import tiles.TrapTile;
@@ -30,10 +31,10 @@ public class MyAutoController extends CarController{
 		private boolean exitFound = false;
 		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
-		private ArrayList<Coordinate> lava = new ArrayList<Coordinate>();
-		private ArrayList<Coordinate> health = new ArrayList<Coordinate>();
-		//private ArrayList<Coordinate> ice = new ArrayList<Coordinate>();
 		
+		private ArrayList<Coordinate> lava = new ArrayList<Coordinate>();
+		private LinkedList<Coordinate> health = new LinkedList<Coordinate>();
+		private LinkedList<Coordinate> water = new LinkedList<Coordinate>();
 		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
 		
 		private CarStrategy strategy; 
@@ -53,6 +54,14 @@ public class MyAutoController extends CarController{
 		
 		public ArrayList<Coordinate> getParcels() {
 			return parcels;
+		}
+		
+		public ArrayList<Coordinate> getLava() {
+			return lava;
+		}
+		
+		public LinkedList<Coordinate> getHealthTiles() {
+			return health;
 		}
 		
 		public ArrayList<Coordinate> getExit() {
@@ -79,8 +88,10 @@ public class MyAutoController extends CarController{
 							}
 						} else if (value2.getTrap().equals("lava")) {
 							lava.add(key);
-						} else if (value2.getTrap().equals("health") || value2.getTrap().equals("water")) {
+						} else if (value2.getTrap().equals("health")) {
 							health.add(key);
+						} else if (value2.getTrap().equals("water")) {
+							water.add(key);
 						}
 					} else if (value.getType() == MapTile.Type.FINISH) {
 						exitFound = true;
@@ -93,12 +104,20 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		public void updateResources(Coordinate coord) {
+			if (parcels.contains(coord)) {
+				parcels.remove(coord);
+			} else if (water.contains(coord)) {
+				water.remove(coord);
+			}
+		}
+		
 		// Coordinate initialGuess;
 		// boolean notSouth = true;
 		@Override
 		public void update() {
+			updateMap(getView());
 			if (phase.equals("explore")) {
-				updateMap(getView());
 				// checkStateChange();
 				if(getSpeed() < CAR_MAX_SPEED){       // Need speed to turn and progress toward the exit
 					applyForwardAcceleration();   // Tough luck if there's a wall in the way
@@ -125,9 +144,7 @@ public class MyAutoController extends CarController{
 						}
 						Coordinate tempcoord = new Coordinate(getPosition());
 						travelled.add(tempcoord);
-						if (parcels.contains(tempcoord)) {
-							parcels.remove(tempcoord);
-						}
+						updateResources(tempcoord);
 					}
 				} else {
 					// Start wall-following (with wall on left) as soon as we see a wall straight ahead
@@ -146,6 +163,7 @@ public class MyAutoController extends CarController{
 				strategy.update(this);
 				Coordinate tempcoord = new Coordinate(getPosition());
 				travelled.add(tempcoord);
+				updateResources(tempcoord);
 				if (parcels.contains(tempcoord)) {
 					parcels.remove(tempcoord);
 				}
@@ -224,6 +242,16 @@ public class MyAutoController extends CarController{
 			}	
 		}
 		
+		public boolean isLava(MapTile tile) {
+			if (tile.isType(MapTile.Type.TRAP)) {
+				TrapTile tile2 = (TrapTile) tile;
+				if (tile2.getTrap().equals("lava")) {
+					return true;
+				}
+			}
+			return false;
+		}
+		
 		/**
 		 * Method below just iterates through the list and check in the correct coordinates.
 		 * i.e. Given your current position is 10,10
@@ -238,16 +266,6 @@ public class MyAutoController extends CarController{
 			for(int i = 0; i <= wallSensitivity; i++){
 				MapTile tile = currentView.get(new Coordinate(currentPosition.x+i, currentPosition.y));
 				if(tile.isType(MapTile.Type.WALL)){
-					return true;
-				}
-			}
-			return false;
-		}
-		
-		public boolean isLava(MapTile tile) {
-			if (tile.isType(MapTile.Type.TRAP)) {
-				TrapTile tile2 = (TrapTile) tile;
-				if (tile2.getTrap().equals("lava")) {
 					return true;
 				}
 			}
