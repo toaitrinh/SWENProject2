@@ -26,12 +26,14 @@ public class MyAutoController extends CarController{
 		// Car Speed to move at
 		private final int CAR_MAX_SPEED = 1;
 		
+		// resources need to be found
 		private int parcelsFound = 0;
 		private ArrayList<Coordinate> parcels = new ArrayList<Coordinate>();
 		private boolean exitFound = false;
 		private ArrayList<Coordinate> exit = new ArrayList<Coordinate>();
 		private String phase = "explore";
 		
+		// keep track of trap tiles and travelled tiles
 		private ArrayList<Coordinate> lava = new ArrayList<Coordinate>();
 		private LinkedList<Coordinate> health = new LinkedList<Coordinate>();
 		private LinkedList<Coordinate> water = new LinkedList<Coordinate>();
@@ -44,8 +46,8 @@ public class MyAutoController extends CarController{
 		public MyAutoController(Car car) {
 			super(car);
 			mode = Simulation.toConserve();
+			// use the factory method to find a strategy
 			strategy = CarStrategyFactory.getInstance().getStrategy(this);
-			HashMap<Coordinate, MapTile> x = getMap();
 		}
 				
 		public Simulation.StrategyMode getMode() {
@@ -117,55 +119,53 @@ public class MyAutoController extends CarController{
 		@Override
 		public void update() {
 			updateMap(getView());
+			// if currently in explore phase
 			if (phase.equals("explore")) {
-				// checkStateChange();
-				if(getSpeed() < CAR_MAX_SPEED){       // Need speed to turn and progress toward the exit
-					applyForwardAcceleration();   // Tough luck if there's a wall in the way
-				}
-				if (isFollowingWall) {
-					// If wall no longer on left, turn left
-					if (travelled.contains(new Coordinate(getPosition()))) {
-						isFollowingWall = false;
-					} else {
-						if(!checkFollowingWall(getOrientation(), map)) {
-							turnLeft();
-						} else {
-							// If wall on left and wall straight ahead, turn right
-							if(checkWallAhead(getOrientation(), map)) {
-								if (!checkWallRight(getOrientation(), map))	{
-									turnRight();
-									isFollowingWall = true;
-								} else if (!checkWallLeft(getOrientation(), map)){
-									turnLeft();
-								} else {
-									applyReverseAcceleration();
-								}
-							}
-						}
-						Coordinate tempcoord = new Coordinate(getPosition());
-						travelled.add(tempcoord);
-						updateResources(tempcoord);
-					}
+				explore();
+			} else {
+				strategy.update(this);
+			}
+			Coordinate tempcoord = new Coordinate(getPosition());
+			travelled.add(tempcoord);
+			updateResources(tempcoord);
+		}
+		
+		public void explore() {
+			if(getSpeed() < CAR_MAX_SPEED){       // Need speed to turn and progress toward the exit
+				applyForwardAcceleration();   // Tough luck if there's a wall in the way
+			}
+			if (isFollowingWall) {
+				// if already been to this tile, stop following the wall
+				if (travelled.contains(new Coordinate(getPosition()))) {
+					isFollowingWall = false;
 				} else {
-					// Start wall-following (with wall on left) as soon as we see a wall straight ahead
-					if(checkWallAhead(getOrientation(), map)) {
-						if (!checkWallRight(getOrientation(), map))	{
-							turnRight();
-							isFollowingWall = true;
-						} else if (!checkWallLeft(getOrientation(), map)){
-							turnLeft();
-						} else {
-							applyReverseAcceleration();
+					if(!checkFollowingWall(getOrientation(), map)) {
+						turnLeft();
+					} else {
+						// If wall on left and wall straight ahead, turn right
+						if(checkWallAhead(getOrientation(), map)) {
+							if (!checkWallRight(getOrientation(), map))	{
+								turnRight();
+								isFollowingWall = true;
+							} else if (!checkWallLeft(getOrientation(), map)){
+								turnLeft();
+							} else {
+								applyReverseAcceleration();
+							}
 						}
 					}
 				}
 			} else {
-				strategy.update(this);
-				Coordinate tempcoord = new Coordinate(getPosition());
-				travelled.add(tempcoord);
-				updateResources(tempcoord);
-				if (parcels.contains(tempcoord)) {
-					parcels.remove(tempcoord);
+				// Start wall-following (with wall on left) as soon as we see a wall straight ahead
+				if(checkWallAhead(getOrientation(), map)) {
+					if (!checkWallRight(getOrientation(), map))	{
+						turnRight();
+						isFollowingWall = true;
+					} else if (!checkWallLeft(getOrientation(), map)){
+						turnLeft();
+					} else {
+						applyReverseAcceleration();
+					}
 				}
 			}
 		}
@@ -191,6 +191,12 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		/**
+		 * Check if you have a wall on your right
+		 * @param orientation the orientation we are in based on WorldSpatial
+		 * @param currentView what the car can currently see
+		 * @return
+		 */
 		private boolean checkWallRight(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView){
 			switch(orientation){
 			case EAST:
@@ -206,6 +212,12 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		/**
+		 * Check if you have a wall on your left
+		 * @param orientation the orientation we are in based on WorldSpatial
+		 * @param currentView what the car can currently see
+		 * @return
+		 */
 		private boolean checkWallLeft(WorldSpatial.Direction orientation, HashMap<Coordinate, MapTile> currentView){
 			switch(orientation){
 			case EAST:
@@ -242,6 +254,7 @@ public class MyAutoController extends CarController{
 			}	
 		}
 		
+		/* Checks if a tile is a lava tile */
 		public boolean isLava(MapTile tile) {
 			if (tile.isType(MapTile.Type.TRAP)) {
 				TrapTile tile2 = (TrapTile) tile;
