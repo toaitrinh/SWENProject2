@@ -9,6 +9,7 @@ import world.WorldSpatial;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Random;
 
 import tiles.MapTile;
 import tiles.TrapTile;
@@ -102,8 +103,9 @@ public class MyAutoController extends CarController{
 			ArrayList<Coordinate> visited = new ArrayList<Coordinate>();
 			queue.add(start);
 			while (!queue.isEmpty()) {
-				Coordinate next = queue.poll();
+				Coordinate temp = queue.poll();
 				for (int i = 0; i < 4; i++) {
+					Coordinate next = new Coordinate(temp.toString());
 					switch(i) {
 					case 0:
 						next.y--;
@@ -195,7 +197,17 @@ public class MyAutoController extends CarController{
 			} else {
 				// Start wall-following (with wall on left) as soon as we see a wall straight ahead
 				if(checkWallAhead(getOrientation(), map)) {
-					if (!checkWallRight(getOrientation(), map))	{
+					if (!checkWallRight(getOrientation(), map) && !checkWallLeft(getOrientation(), map)) {
+						// implementing some randomness so doesnt get stuck in loop
+						Random rand = new Random();
+						int n = rand.nextInt(2);
+						if (n==0) {
+							turnLeft();
+						} else {
+							turnRight();
+							isFollowingWall = true;
+						}
+					} else if (!checkWallRight(getOrientation(), map))	{
 						turnRight();
 						isFollowingWall = true;
 					} else if (!checkWallLeft(getOrientation(), map)){
