@@ -44,36 +44,45 @@ public class HealthStrategy implements CarStrategy{
 		Coordinate carPos = new Coordinate(car.getPosition());
 		if (car.numParcelsFound() >= car.numParcels()) {
 			path = new LinkedList<Coordinate>();
-			int lavaCount = bfs(car, carPos, exit, parents, path) * 5;
+			int lavaCount = bfs(car, carPos, exit, parents, path, false) * 5;
+			System.out.printf("lavaCount is %d\n", lavaCount);
 			if ((car.getHealth() - lavaCount) > 0) {
 				go(car, exit, parents, path);
 			} else {
-				int healthNeeded = (int) (car.getHealth() - lavaCount + 5)/5;
+				int healthNeeded = (int) (lavaCount - car.getHealth() + 5)/5;
 				for (int i = 0; i < healthNeeded; i++) {
 					for (Coordinate htile: health) {
-						if (bfs(car, carPos, htile, parents, path) == 0) {
+						path = new LinkedList<Coordinate>();
+						if (bfs(car, carPos, htile, parents, path, true) == 0) {
 							go(car, htile, parents, path);
 							break;
 						}
 					}
 				}
+				path = new LinkedList<Coordinate>();
+				bfs(car, carPos, exit, parents, path, false);
 				go(car, exit, parents, path);
 			}
 		} else {
 			path = new LinkedList<Coordinate>();
-			int lavaCount = bfs(car, carPos, order.get(0), parents, path) * 5;
+			int lavaCount = bfs(car, carPos, order.get(0), parents, path, false) * 5;
+			System.out.printf("lavaCount is %d\n", lavaCount);
 			if ((car.getHealth() - lavaCount) > 0) {
 				go(car, order.get(0), parents, path);
 			} else {
-				int healthNeeded = (int) (car.getHealth() - lavaCount + 5)/5;
+				int healthNeeded = (int) (lavaCount - car.getHealth() + 5)/5;
 				for (int i = 0; i < healthNeeded; i++) {
 					for (Coordinate htile: health) {
-						if (bfs(car, carPos, htile, parents, path) == 0) {
+						path = new LinkedList<Coordinate>();
+						if (bfs(car, carPos, htile, parents, path, true) == 0) {
 							go(car, htile, parents, path);
+							health.remove(htile);
 							break;
 						}
 					}
 				}
+				path = new LinkedList<Coordinate>();
+				bfs(car, carPos, order.get(0), parents, path, false);
 				go(car, order.get(0), parents, path);
 			}
 			// execute movement along that path
@@ -86,7 +95,7 @@ public class HealthStrategy implements CarStrategy{
 		//Coordinate nextPos = parents.get(currentPos);
 		Coordinate nextPos = path.getLast();
 		System.out.printf("nextpos is %s currentPos is %s\n", nextPos.toString(), currentPos.toString());
-		System.out.printf("Orientation is %s", car.getOrientation());
+		System.out.printf("Orientation is %s\n", car.getOrientation());
 		// Go one tile right
 		if (nextPos.x > currentPos.x) {
 			switch(car.getOrientation()) {
@@ -167,7 +176,7 @@ public class HealthStrategy implements CarStrategy{
 	}	
 	
 	
-	public int bfs(MyAutoController car, Coordinate start, Coordinate end, HashMap<Coordinate, Coordinate> parents, LinkedList<Coordinate> path) {
+	public int bfs(MyAutoController car, Coordinate start, Coordinate end, HashMap<Coordinate, Coordinate> parents, LinkedList<Coordinate> path, boolean forHealth) {
 		//HashMap<Coordinate, Integer> cost = new HashMap<Coordinate, Integer>();
 		//cost.put(start, 0);
 		HashMap<Coordinate, MapTile> map = World.getMap();
@@ -199,17 +208,22 @@ public class HealthStrategy implements CarStrategy{
 				}
 				if (!map.get(next).isType(MapTile.Type.WALL) && !visited.contains(next)) {
 					boolean isHealth = false;
-					for (Coordinate ltile: lava) {
-						if (ltile.equals(next)) {
-							lavaCount++;
-						}
-					}
 					for (Coordinate htile: health) {
 						if (htile.equals(next)) {
 							isHealth = true;
 						}
 					}
-					if (!isHealth) {
+					if (!forHealth) {
+						if (!isHealth) {
+							parents.put(next, temp);
+							queue.add(next);
+							visited.add(next);
+							//cost.put(next, tempCost+1);
+							if (end.equals(next)) {
+								break;
+							}
+						}
+					} else {
 						parents.put(next, temp);
 						queue.add(next);
 						visited.add(next);
@@ -234,12 +248,17 @@ public class HealthStrategy implements CarStrategy{
 			Coordinate temp2 = parents.get(main);
 			if (!(temp2.equals(start))) {
 				path.add(temp2);
+				for (Coordinate ltile: lava) {
+					if (ltile.equals(temp2)) {
+						lavaCount++;
+					}
+				}
 			}
 			main.x = temp2.x;
 			main.y = temp2.y;
 		}
 		
-		
+		System.out.printf("lavaCount is %d\n", lavaCount);
 		//return tileDistance;
 		return lavaCount;
 	}

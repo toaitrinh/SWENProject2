@@ -69,12 +69,12 @@ public abstract class CarController {
 		return car.getSpeed();
 	}
 
-//	/**
-//	 * Returns the car's current velocity.
-//	 */
-//	public int getVelocity(){
-//		return car.getVelocity();
-//	}
+	/**
+	 * Returns the car's current velocity.
+	 */
+	public int getVelocity(){
+		return car.getVelocity();
+	}
 	
 	/**
 	 * Returns the car's current health
