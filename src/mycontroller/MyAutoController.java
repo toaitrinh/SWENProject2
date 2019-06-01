@@ -28,6 +28,9 @@ public class MyAutoController extends CarController{
 		// Car Speed to move at
 		private final int CAR_MAX_SPEED = 1;
 		
+		// the strategy to be used
+		private CarStrategy strategy; 
+		
 		// resources need to be found
 		private int parcelsFound = 0;
 		private ArrayList<Coordinate> parcels = new ArrayList<Coordinate>();
@@ -41,22 +44,18 @@ public class MyAutoController extends CarController{
 		private LinkedList<Coordinate> water = new LinkedList<Coordinate>();
 		private ArrayList<Coordinate> travelled = new ArrayList<Coordinate>();
 		
+		// list of tiles it is possible to travel to
 		private ArrayList<Coordinate> possibleTiles;
 		
-		private CarStrategy strategy; 
-		
-		private static Simulation.StrategyMode mode;
-				
 		public MyAutoController(Car car) {
 			super(car);
-			mode = Simulation.toConserve();
 			possibleTiles = possibleTiles(new Coordinate(getPosition()));
 			// use the factory method to find a strategy
 			strategy = CarStrategyFactory.getInstance().getStrategy(this);
 		}
 				
 		public Simulation.StrategyMode getMode() {
-			return mode;
+			return Simulation.toConserve();
 		}
 		
 		public ArrayList<Coordinate> getParcels() {
@@ -137,7 +136,7 @@ public class MyAutoController extends CarController{
 					MapTile value = currentView.get(key);
 					map.put(key, value);
 					if (value.getType() == MapTile.Type.TRAP) {
-						TrapTile value2 = (TrapTile) value;
+						TrapTile value2 = (TrapTile) value; // downcast to find type
 						if (value2.getTrap().equals("parcel") && possibleTiles.contains(key)) {
 							parcelsFound++;
 							parcels.add(key);
@@ -162,6 +161,7 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		// removes one off resources
 		public void updateResources(Coordinate coord) {
 			if (parcels.contains(coord)) {
 				parcels.remove(coord);
@@ -170,6 +170,9 @@ public class MyAutoController extends CarController{
 			}
 		}
 		
+		/**
+		 * Runs around the map, by following walls, looking for exits and required number of parcels
+		 */
 		public void explore() {
 			if(getSpeed() < CAR_MAX_SPEED){       // Need speed to turn and progress toward the exit
 				applyForwardAcceleration();   // Tough luck if there's a wall in the way

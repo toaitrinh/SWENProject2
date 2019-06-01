@@ -15,10 +15,8 @@ public class FuelStrategy implements CarStrategy{
 		// TODO Auto-generated method stub
 		// parents is a map of parent nodes to child nodes
 		HashMap<Coordinate, Coordinate> parents = new HashMap<Coordinate, Coordinate>();
-
+		// the exit to get to
 		Coordinate exit = car.getExit().get(0);
-		
-		ArrayList<Coordinate> travelled = car.getTravelled();
 		// order is used for coordinate order we have to traverse in order to be fuel efficient
 		LinkedList<Coordinate> order = new LinkedList<Coordinate>();
 		// distance is just a guide for order
@@ -38,17 +36,14 @@ public class FuelStrategy implements CarStrategy{
 				while (d[k] > d[m]) {
 					m++;
 				}
-				if (!travelled.contains(car.getParcels().get(k))) {
+				if (!car.getTravelled().contains(car.getParcels().get(k))) {
 					order.add(m, car.getParcels().get(k));
 					distance.add(m, d[k]);
 				}
 			}
 		}
 		
-		
-		// This is just a trial run to get from one place to another
-		// Not yet implemented the remaining parts of going through all the parcels then the exit
-		// bfs through car to first parcel so that we can get a node of parents along that path
+		// if we have enough parcels, go to exit or else keep looking for parcels
 		Coordinate carPos = new Coordinate(car.getPosition());
 		if (car.numParcelsFound() >= car.numParcels()) {
 			path = new LinkedList<Coordinate>();
@@ -57,17 +52,14 @@ public class FuelStrategy implements CarStrategy{
 		} else {
 			path = new LinkedList<Coordinate>();
 			bfs(carPos, order.get(0), parents, path);
-			// execute movement along that path
 			go(car, order.get(0), path);
 		}
 	}
 	
+	/* Go to a destination */
 	public void go(MyAutoController car, Coordinate dest, LinkedList<Coordinate> path) {
 		Coordinate currentPos = new Coordinate(car.getPosition());
-		//Coordinate nextPos = parents.get(currentPos);
 		Coordinate nextPos = path.getLast();
-		System.out.printf("nextpos is %s currentPos is %s\n", nextPos.toString(), currentPos.toString());
-		System.out.printf("Orientation is %s", car.getOrientation());
 		// Go one tile right
 		if (nextPos.x > currentPos.x) {
 			switch(car.getOrientation()) {
@@ -87,7 +79,7 @@ public class FuelStrategy implements CarStrategy{
 				break;
 			}
 			currentPos.x = nextPos.x;
-			// Go one tile Left
+		// Go one tile Left
 		} else if (nextPos.x < currentPos.x) {
 			switch(car.getOrientation()) {
 			case WEST:
@@ -147,7 +139,7 @@ public class FuelStrategy implements CarStrategy{
 		}	
 	}	
 	
-	
+	/* Do a breadth first search from one coordinate to another */
 	public int bfs(Coordinate start, Coordinate end, HashMap<Coordinate, Coordinate> parents, LinkedList<Coordinate> path) {
 		HashMap<Coordinate, Integer> cost = new HashMap<Coordinate, Integer>();
 		cost.put(start, 0);
